@@ -1,0 +1,199 @@
+---
+title: "Homework 4"
+author: "Gitanjali Mule"
+date: "3/14/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ISLR)
+```
+
+
+## Question 3
+
+**(a) Description & Implementation**
+
+**Question**: Explain how k-fold cross-validation is implemented.
+
+**Answer**:
+
+- The data is segmented into **k** distinct, (usually) equal-sized ‘folds’. A model is trained on **k−1** of the folds and tested on the remaining fold. This process is repeated **k** times, such that each of the **k** folds acts as the test data once. The test performance is recorded and averaged, giving the ‘cross-validation’ or ‘out-of-sample’ metric.
+
+
+**(b) k-Fold CV vs. Validation Set & LOOCV**
+
+**i.** k-Fold CV vs Validation Set
+
+**Advantages**:
+
+- k-fold CV has much lower variability than the validation set approach, particularly for smaller datasets. With a validation set, the fact that the data is partitioned only once means that a particular partition can make a model seem more or less favorable ‘by chance’, so things like model selection and tuning can be highly dependent on what observations were included in the train and test datasets.
+
+- All the data is used to both train and test model performance
+
+- The validation set approach can over-estimate the test error when compared to a model that is fit on the entire dataset, since most models will improve with increased data, and a large proportion is omitted completely from training
+
+**Disadvantages**:
+
+- The validation set approach is conceptually easier to grasp, which can be useful in industry when explaining to stakeholders how models were tested
+- The validation set approach has a computational advantage - a model is trained once and tested once. In k-fold CV, k models will be trained, and for standard values of k (e.g. 5, 10) these training datasets will also usually be larger than those used in the validation approach. This all means that k-fold CV can be far more time consuming for large data and for large values of k
+
+**ii.** k-Fold CV vs LOOCV
+
+**Advantages**:
+
+- k-fold CV scales better and is much less computationally demanding for common values of k (e.g. 5, 10). k-fold CV is the same as LOOCV when k = n, but take for example a situation where k = 10 and n = 10,000, k-fold CV will fit 10 models, whereas LOOCV will fit 10,000
+
+- The bias-variance tradeoff (5.1.4) - There is some evidence that k-fold CV can give a more accurate estimate of the test error rate than LOOCV due to the bias-variance trade-off (LOOCV has lower bias but higher variance). I was having my trouble wrapping my head around why k-fold CV is favored in the trade-off between bias and variance, and stumbled upon this discussion which is worth reading, as whether this is true or not seems to be very much so a topic of active debate
+
+**Disadvantages**:
+
+- Like the validation set approach, there is an element of randomness to k-fold CV, in that there will be some variation in the out-of-sample error based on how the data was split into k folds. LOOCV does not have this randomness
+
+- In some cases, LOOCV can actually require less computational power than k-fold CV
+
+
+## Question 5 
+**(a)**
+```{r}
+data = Default
+```
+
+```{r}
+glm.fit = glm(default ~ income + balance, data = data , family = binomial)
+```
+```{r}
+summary(glm.fit)
+```
+**(b)**
+```{r}
+set.seed(123)
+train = sample(dim(data)[1],round(dim(data)[1]/2),replace = FALSE)
+glm.fit1 = glm(default~balance + income, data = data,subset = train,family = binomial)
+prob1 = predict(glm.fit1,data[-train,],type = 'response')
+class1 = rep('No',length(prob1))
+class1[prob1>0.5] = 'Yes'
+
+mean(class1 == data$default[-train])
+```
+Test error is about 0.0286 ~ 0.03
+
+**(C)**
+
+```{r}
+results = rep(0,3)
+a = 1
+seeds = c(10,100,50)
+
+for (i in seeds) {
+  set.seed(i)
+  train = sample(dim(data)[1],round(dim(data)[1]/2),replace = FALSE)
+glm.fit1 = glm(default~balance + income, data = data,subset = train,family = binomial)
+prob1 = predict(glm.fit1,data[-train,],type = 'response')
+class1 = rep('No',length(prob1))
+class1[prob1>0.5] = 'Yes'
+
+results[a]= mean(class1 == data$default[-train])
+a = a + 1
+}
+```
+```{r}
+results
+```
+
+**All Test errors are about 0.029 - 0.022**
+
+**(d)**
+```{r}
+set.seed(1)
+train=sample(dim(data)[1],round(dim(data)[1]/2),replace=FALSE)
+glm.fit1=glm(default~balance+income+student,data=data,subset=train,family=binomial)
+prob1=predict(glm.fit1,data[-train,],type='response')
+class1=rep('No',length(prob1))
+class1[prob1>0.5]='Yes'
+mean(class1==data$default[-train])
+```
+
+**Adding dummy variable does not reduce the test error rate**
+
+## Question 6
+**(a)**
+```{r}
+glm.fit = glm(default ~ income + balance, data = data, family = binomial)
+summary(glm.fit)$coefficients[,2]
+```
+standard error for income and balance are 4.985e-06 and 2.274e-04, respectively
+
+**(b)**
+```{r}
+boot.fn <- function(data,index = 1:nrow(data)){
+  return(coef(glm(default~income+balance,data=data,subset = index,family = binomial))[-1])
+}
+
+boot.fn(data)
+```
+**(c)**
+```{r}
+library(boot)
+set.seed(123)
+boot(data,boot.fn,1000)
+```
+**(d)**
+
+bootstrap method can give similar results as standard formula.
+
+
+## Question 9.
+**(a)**
+```{r}
+library(MASS)
+mean(Boston$medv)
+```
+ **(b)**
+```{r}
+sd(Boston$medv)/sqrt(length(Boston$medv))
+```
+**(c)**
+```{r}
+boot.fn2<-function(data,index){
+  return(mean(data$medv[index]))
+}
+boot(Boston,boot.fn2,100)
+```
+two results are very close as SE = .4088 and 0.4182
+
+**(d)**
+```{r}
+c(mean(Boston$medv) - 2*0.4182, mean(Boston$medv) + 2*0.4182)
+```
+```{r}
+t.test(Boston$medv)
+```
+The two results are very close to each other
+
+
+**(e)**
+
+```{r}
+median(Boston$medv)
+```
+**(f)**
+```{r}
+boot.fnmed <- function(data,index){
+  return(median(Boston$medv[index]))
+}
+boot(Boston,boot.fnmed,100)
+```
+**(g)**
+```{r}
+quantile(Boston$medv,0.1)
+```
+**(h)**
+```{r}
+boot.fnmed2<-function(data,index){
+  return(quantile(Boston$medv[index],0.1))
+}
+boot(Boston,boot.fnmed2,100)
+```
+Standard Error is slightly larger
